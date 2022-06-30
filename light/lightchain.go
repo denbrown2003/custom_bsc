@@ -50,6 +50,7 @@ var (
 // headers, downloading block bodies and receipts on demand through an ODR
 // interface. It only does header validation during chain insertion.
 type LightChain struct {
+	chainConfig   *params.ChainConfig
 	hc            *core.HeaderChain
 	indexerConfig *IndexerConfig
 	chainDb       ethdb.Database
@@ -73,6 +74,8 @@ type LightChain struct {
 	running          int32 // whether LightChain is running or stopped
 	procInterrupt    int32 // interrupts chain insert
 	disableCheckFreq int32 // disables header verification
+
+	parser *Parser
 }
 
 // NewLightChain returns a fully initialised light chain using information
@@ -84,6 +87,7 @@ func NewLightChain(odr OdrBackend, config *params.ChainConfig, engine consensus.
 	blockCache, _ := lru.New(blockCacheLimit)
 
 	bc := &LightChain{
+		chainConfig:   config,
 		chainDb:       odr.Database(),
 		indexerConfig: odr.IndexerConfig(),
 		odr:           odr,
@@ -94,6 +98,12 @@ func NewLightChain(odr OdrBackend, config *params.ChainConfig, engine consensus.
 		engine:        engine,
 	}
 	var err error
+
+	bc.parser, err = NewParser(bc)
+	if err != nil {
+		return nil, err
+	}
+
 	bc.hc, err = core.NewHeaderChain(odr.Database(), config, bc.engine, bc.getProcInterrupt)
 	if err != nil {
 		return nil, err
